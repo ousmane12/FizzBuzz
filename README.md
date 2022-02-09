@@ -8,3 +8,5 @@ FizzBuzz game in java using Gradle, jUnit for testing the game
 - Download dependencies such as jUnit in the build.gradle file
 # To make Unit test
 You have to run the Tests.java file where you will find the playFizzBuzz method test
+# License
+[MIT] Enjoy it

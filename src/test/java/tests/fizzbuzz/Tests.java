@@ -17,8 +17,11 @@ public class Tests {
         int last = 100;
         //Arrange
         Numbers numbers = new Numbers();
-        //Action
+        //Action on methods
+        //Method 1
         ArrayList<String> myGame = numbers.play(start,last);
+        //Method 2
+        ArrayList<String> myGame2 = numbers.playStage2(start,last);
 
         //Assert
         Assertions.assertEquals(1, start);
@@ -31,6 +34,10 @@ public class Tests {
 
         System.out.println("***************************");
         System.out.println("Result game: "+myGame);
+        System.out.println("***************************");
+
+        System.out.println("***************************");
+        System.out.println("Result game stage 2: "+myGame2);
         System.out.println("***************************");
     }
 }

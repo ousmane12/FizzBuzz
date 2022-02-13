@@ -33,4 +33,19 @@ public class Numbers {
             }
         return liste;
     }
+    public ArrayList<String> playStage2(int start, int last){
+        //Initialize a list that holds all values according to whether it is a simple value,
+        //Fizz value, FizzBuzz value or Buzz value
+        ArrayList<String> liste = new ArrayList<>();
+        for (int i = start; i <= last; i++) {
+            if (i % 3 == 0 || Integer.toString(i).startsWith("3") || Integer.toString(i).endsWith("3")) {
+                liste.add("Fizz");
+            } else if (i % 5 == 0 || Integer.toString(i).startsWith("5") || Integer.toString(i).endsWith("5")) {
+                liste.add("Buzz");
+            } else {
+                liste.add(Integer.toString(i));
+            }
+        }
+        return liste;
+    }
 }

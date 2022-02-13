@@ -3,7 +3,7 @@
 FizzBuzz game in java using Gradle, jUnit for testing the game
 
 # To run this game
-- You will need to downlod and configure Gradle in your preferred IDE (mine is intelliJ)
+- You will need to download and configure Gradle in your preferred IDE (mine is intelliJ)
 - Have installed JDK atleast 8 
 - Download dependencies such as jUnit in the build.gradle file
 # To make Unit test

@@ -8,10 +8,15 @@ import android.annotation.SuppressLint;
 import android.app.PendingIntent;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.media.Ringtone;
+import android.media.RingtoneManager;
+import android.net.Uri;
+import android.nfc.FormatException;
 import android.nfc.NdefMessage;
 import android.nfc.NdefRecord;
 import android.nfc.NfcAdapter;
 import android.nfc.Tag;
+import android.nfc.TagLostException;
 import android.nfc.tech.IsoDep;
 import android.nfc.tech.MifareClassic;
 import android.nfc.tech.MifareUltralight;
@@ -24,6 +29,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Parcelable;
 import android.util.Log;
+import android.widget.Toast;
 
 import com.sunmi.printerhelper.R;
 
@@ -31,9 +37,11 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
 
-public class ScanActivity extends AppCompatActivity {
+@SuppressLint("NewApi")
+public class ScanActivity extends AppCompatActivity implements NfcAdapter.ReaderCallback {
     String tag;
     Tag tags;
+    private NfcAdapter mNfcAdapter;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -41,65 +49,61 @@ public class ScanActivity extends AppCompatActivity {
 
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN)
+//    @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN)
+//    @Override
+//    public void onNewIntent(Intent intent) {
+//        super.onNewIntent(intent);
+//        if ( intent.getAction().equals(NfcAdapter.ACTION_NDEF_DISCOVERED) ) {
+//            Tag tags = (Tag) intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
+//            System.out.println("Intent "+intent.getAction());
+//            long payload = detectTagData(tags);
+//            tag = ByteArrayToHexString(intent.getByteArrayExtra(NfcAdapter.EXTRA_ID));
+//            System.out.println("PayLoad "+payload);
+//            //tags = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
+//            this.getIntent().putExtra("tag", tag);
+//            readFromIntent(intent);
+//            //resolveIntent(intent);
+//            //setResult(RESULT_OK, this.getIntent());
+//            //finish();
+//
+//
+//
+//
+//        }
+//
+//    }
+
+
     @Override
-    public void onNewIntent(Intent intent) {
+    protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
-        if (intent.getAction().equals(NfcAdapter.ACTION_TAG_DISCOVERED)) {
-            Tag tags = (Tag) intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
-            byte[] id = tags.getId();
-            long payload = detectTagData(tags);
-            tag = ByteArrayToHexString(intent.getByteArrayExtra(NfcAdapter.EXTRA_ID));
-            System.out.println("PayLoad "+payload);
-            //tags = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
-            this.getIntent().putExtra("tag", tag);
-            //readFromIntent(intent);
-            //resolveIntent(intent);
-            //setResult(RESULT_OK, this.getIntent());
-            //finish();
-            String action = intent.getAction();
-            Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
-            String s = action + "nn" + tag.toString();
-            Parcelable[] data = intent.getParcelableArrayExtra(NfcAdapter.EXTRA_AID);
-            System.out.println("DATA "+data);
-            if (data != null) {
-                try {
-                    for (int i = 0; i < data.length; i++) {
-                        NdefRecord [] recs = ((NdefMessage)data[i]).getRecords();
-                        for (int j = 0; j < recs.length; j++) {
-                            if (recs[j].getTnf() == NdefRecord.TNF_WELL_KNOWN &&
-                                    Arrays.equals(recs[j].getType(), NdefRecord.RTD_TEXT)) {
-                                byte[] payloads = recs[j].getPayload();
-                                String textEncoding = ((payloads[0] & 0200) == 0) ? "UTF-8" : "UTF-16";
-                                int langCodeLen = payloads[0] & 0077;
-
-                                s += ("nnNdefMessage[" + i + "], NdefRecord[" + j + "]:n" + new String(payloads, langCodeLen + 1, payloads.length - langCodeLen - 1,
-                                        textEncoding) + "");
-                                System.out.println("Stering "+s);
-                            }
-                        }
-                    }
-                } catch (Exception e) {
-                    Log.e("TagDispatch", e.toString());
-                }
-            }
+        if (NfcAdapter.ACTION_NDEF_DISCOVERED.equals(intent.getAction())) {
+            parseNdefMessage(intent);
         }
-
     }
 
-
+    @SuppressLint("NewApi")
     @Override
     protected void onResume() {
         super.onResume();
         // creating pending intent:
-        @SuppressLint("UnspecifiedImmutableFlag") PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, new Intent(this, getClass()).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP), 0);
-        // creating intent receiver for NFC events:
-        IntentFilter filter = new IntentFilter();
-        filter.addAction(NfcAdapter.ACTION_TAG_DISCOVERED);
-        filter.addAction(NfcAdapter.ACTION_NDEF_DISCOVERED);
-        filter.addAction(NfcAdapter.ACTION_TECH_DISCOVERED);
-        NfcAdapter nfcAdapter = NfcAdapter.getDefaultAdapter(this);
-        nfcAdapter.enableForegroundDispatch(this, pendingIntent, new IntentFilter[]{filter}, this.techList);
+        if(mNfcAdapter!= null) {
+            Bundle options = new Bundle();
+            // Work around for some broken Nfc firmware implementations that poll the card too fast
+            options.putInt(NfcAdapter.EXTRA_READER_PRESENCE_CHECK_DELAY, 250);
+
+            // Enable ReaderMode for all types of card and disable platform sounds
+            mNfcAdapter.enableReaderMode(this,
+                    this,
+                    NfcAdapter.FLAG_READER_NFC_A |
+                            NfcAdapter.FLAG_READER_NFC_B |
+                            NfcAdapter.FLAG_READER_NFC_F |
+                            NfcAdapter.FLAG_READER_NFC_V |
+                            NfcAdapter.FLAG_READER_NFC_BARCODE |
+                            NfcAdapter.FLAG_READER_NO_PLATFORM_SOUNDS,
+                    options);
+        }
+
     }
 
 
@@ -153,23 +157,22 @@ public class ScanActivity extends AppCompatActivity {
 
     @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN)
     private void readFromIntent(Intent intent) {
-        System.out.println("Came huered ");
+
         String action = intent.getAction();
-        if (NfcAdapter.ACTION_TAG_DISCOVERED.equals(action)
-                || NfcAdapter.ACTION_TECH_DISCOVERED.equals(action)
-                || NfcAdapter.ACTION_NDEF_DISCOVERED.equals(action)) {
-            System.out.println("Here too");
+        System.out.println("Action "+action.toString());
+        if (NfcAdapter.ACTION_NDEF_DISCOVERED.equals(action)) {
+            System.out.println("enterewd "+NfcAdapter.ACTION_TAG_DISCOVERED);
             Parcelable[] rawMessages = intent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES);
+            System.out.println("NUOO "+rawMessages);
             NdefMessage[] messages ;
-            System.out.println("Rwa "+rawMessages);
             if (rawMessages != null) {
                 messages = new NdefMessage[rawMessages.length];
                 for (int i = 0; i < rawMessages.length; i++) {
                     messages[i] = (NdefMessage) rawMessages[i];
                     NdefRecord [] records = messages[i].getRecords();
-                    System.out.println("RECORDS "+records);
                     //if you are sure you have text then you don't need to test TNF
                     for(NdefRecord record: records){
+
                         processRecord(record);
                     }
                 }
@@ -178,26 +181,36 @@ public class ScanActivity extends AppCompatActivity {
     }
 
     public void processRecord(NdefRecord record) {
-
         short tnf = record.getTnf();
-        switch (tnf) {
+        byte[] type = record.getType();
 
-
-            case NdefRecord.TNF_MIME_MEDIA: {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-                    if (record.toMimeType().equals("MIME/Type")) {
-                        // handle this as you want
-                        System.out.println("HEREEEE");
-                    } else {
-                        //Record is not our MIME
-                    }
-                }
-            }
-            // you can write more cases
-            default: {
-                //unsupported NDEF Record
-            }
+        System.out.println("TNF "+tnf);
+        System.out.println("TYPE "+type);
+        if (tnf == NdefRecord.TNF_WELL_KNOWN &&
+                Arrays.equals(type, NdefRecord.RTD_TEXT)) {
+            // Correct TNF and Type for Text record
+            // Now process the Text Record encoding
+            System.out.println("fghjkg "+processRtdTextRecord(type));
+            System.out.println("TEXT RECORD>>> "+NdefRecord.RTD_TEXT);
         }
+//        switch (tnf) {
+//
+//            case NdefRecord.TNF_MIME_MEDIA: {
+//                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+//        if (record.toMimeType().equals("text/plain")){
+//                    if (tnf == NdefRecord.TNF_WELL_KNOWN &&
+//                            Arrays.equals(type, NdefRecord.RTD_TEXT)){
+//                        // Correct TNF and Type for Text record
+//                        // Now process the Text Record encoding
+//
+//                    }
+//                }
+//            }
+//            // you can write more cases
+//            default: {
+//                //unsupported NDEF Record
+//            }
+//        }
     }
 
     private String processRtdTextRecord(byte[] payload) {
@@ -261,6 +274,95 @@ public class ScanActivity extends AppCompatActivity {
 
     }
 
+    void parseNdefMessage(Intent intent) {
+        Parcelable[] ndefMessageArray = intent.getParcelableArrayExtra(
+                NfcAdapter.EXTRA_NDEF_MESSAGES);
+        // Test if there is actually a NDef message passed via the Intent
+        if (ndefMessageArray != null) {
+            NdefMessage ndefMessage = (NdefMessage) ndefMessageArray[0];
+            //Get Bytes of payload
+            byte[] payload = ndefMessage.getRecords()[0].getPayload();
+            // Read First Byte and then trim off the right length
+            byte[] textArray = Arrays.copyOfRange(payload, (int) payload[0] + 1, payload.length);
+            // Convert to Text
+            String text = new String(textArray);
+            System.out.println("Text "+text);
+        }
+    }
 
+    @RequiresApi(api = Build.VERSION_CODES.KITKAT)
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if(mNfcAdapter!= null)
+            mNfcAdapter.disableReaderMode(this);
+    }
+
+
+    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+    @Override
+    public void onTagDiscovered(Tag tag) {
+        // Read and or write to Tag here to the appropriate Tag Technology type class
+        // in this example the card should be an Ndef Technology Type
+        Ndef mNdef = Ndef.get(tag);
+
+        // Check that it is an Ndef capable card
+        if (mNdef!= null) {
+
+            // If we want to read
+            // As we did not turn on the NfcAdapter.FLAG_READER_SKIP_NDEF_CHECK
+            // We can get the cached Ndef message the system read for us.
+
+            NdefMessage mNdefMessage = mNdef.getCachedNdefMessage();
+
+
+            // Or if we want to write a Ndef message
+
+            // Create a Ndef Record
+            NdefRecord mRecord = NdefRecord.createTextRecord("en","English String");
+
+            // Add to a NdefMessage
+            NdefMessage mMsg = new NdefMessage(mRecord);
+
+            // Catch errors
+            try {
+                mNdef.connect();
+                mNdef.writeNdefMessage(mMsg);
+
+                // Success if got to here
+                runOnUiThread(() -> {
+                    Toast.makeText(getApplicationContext(),
+                            "Write to NFC Success",
+                            Toast.LENGTH_SHORT).show();
+                });
+
+                // Make a Sound
+                try {
+                    Uri notification = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+                    Ringtone r = RingtoneManager.getRingtone(getApplicationContext(),
+                            notification);
+                    r.play();
+                } catch (Exception e) {
+                    // Some error playing sound
+                }
+
+            } catch (FormatException e) {
+                // if the NDEF Message to write is malformed
+            } catch (TagLostException e) {
+                // Tag went out of range before operations were complete
+            } catch (IOException e){
+                // if there is an I/O failure, or the operation is cancelled
+            } finally {
+                // Be nice and try and close the tag to
+                // Disable I/O operations to the tag from this TagTechnology object, and release resources.
+                try {
+                    mNdef.close();
+                } catch (IOException e) {
+                    // if there is an I/O failure, or the operation is cancelled
+                }
+            }
+
+        }
 
     }
+}
